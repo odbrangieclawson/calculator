@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profit Calculator</title>
+<meta name="description" content="Work out net profit, margin and break-even price from cost of goods, selling price and any fees you pay.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#f2f3f6; --panel:#ffffff; --panel-2:#f8f9fb;
+    --ink:#171a21; --muted:#697083;
+    --line:#dfe2e9; --line-soft:#eaecf1;
+    --accent:#2b4a8b; --accent-soft:#e7ecf7;
+    --profit:#147a55; --loss:#b23b2c; --loss-soft:#fbeceb;
+    --fees:#c98a2e; --cogs:#7d8798;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(23,26,33,.05), 0 12px 28px -18px rgba(23,26,33,.35);
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#10131a; --panel:#171b24; --panel-2:#1c212c;
+      --ink:#e6e9ef; --muted:#939cad;
+      --line:#2a3140; --line-soft:#222834;
+      --accent:#7fa0ff; --accent-soft:#1d2740;
+      --profit:#45d69a; --loss:#ff8d7c; --loss-soft:#2b1614;
+      --fees:#d79a3f; --cogs:#6d7889;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 12px 28px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#10131a; --panel:#171b24; --panel-2:#1c212c;
+    --ink:#e6e9ef; --muted:#939cad;
+    --line:#2a3140; --line-soft:#222834;
+    --accent:#7fa0ff; --accent-soft:#1d2740;
+    --profit:#45d69a; --loss:#ff8d7c; --loss-soft:#2b1614;
+    --fees:#d79a3f; --cogs:#6d7889;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 12px 28px -18px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font:15px/1.55 var(--sans);
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 72px;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px}
+
+  /* ---- header ---- */
+  header{padding:40px 0 26px;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+  h1{
+    font:600 27px/1.15 var(--mono);
+    letter-spacing:-.025em;margin:0 0 5px;text-wrap:balance;
+  }
+  .sub{color:var(--muted);font-size:14px;margin:0;max-width:46ch}
+  .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  /* ---- layout ---- */
+  .grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);gap:20px;align-items:start}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  .col{display:flex;flex-direction:column;gap:20px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-head{padding:15px 18px 0;display:flex;align-items:center;gap:10px}
+  .eyebrow{
+    font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.13em;
+    color:var(--muted);margin:0;
+  }
+  .card-body{padding:14px 18px 18px}
+
+  /* ---- form ---- */
+  label{display:block;font-size:13px;font-weight:500;color:var(--muted);margin:0 0 6px}
+  label .opt{font-weight:400;color:var(--muted);opacity:.75}
+  .fields{display:flex;flex-direction:column;gap:14px}
+  .row3{display:grid;grid-template-columns:1fr 1fr .68fr;gap:12px}
+  @media (max-width:580px){ .row3{grid-template-columns:1fr} }
+  .input-wrap{position:relative;display:flex;align-items:center}
+  .input-wrap .sym{
+    position:absolute;left:12px;color:var(--muted);pointer-events:none;
+    font:400 13px/1 var(--mono);
+  }
+  input[type=text],input[type=number],select{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--panel-2);color:var(--ink);font:inherit;
+    transition:border-color .12s,box-shadow .12s;
+  }
+  input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .input-wrap.has-sym input{padding-left:32px}
+  input:focus-visible,select:focus-visible,button:focus-visible{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)
+  }
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  select{cursor:pointer;font-size:13.5px}
+
+  button{
+    font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--ink);padding:8px 13px;
+    transition:background .12s,border-color .12s,color .12s;
+  }
+  button:hover{border-color:var(--muted)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+  button.primary:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent}
+  #theme{width:34px;height:34px;padding:0;font-size:15px;line-height:1}
+
+  /* ---- fee rows ---- */
+  .fee-row{
+    display:grid;grid-template-columns:minmax(0,1.35fr) 94px minmax(0,152px) 30px;
+    gap:8px;align-items:center;
+  }
+  .fee-list{display:flex;flex-direction:column;gap:8px}
+  @media (max-width:580px){
+    .fee-row{grid-template-columns:1fr 1fr;grid-template-areas:"n n" "v t" "x x";
+      padding-bottom:10px;border-bottom:1px solid var(--line-soft)}
+    .fee-row .fname{grid-area:n} .fee-row .fval{grid-area:v}
+    .fee-row .ftype{grid-area:t} .fee-row .fdel{grid-area:x;justify-self:end}
+  }
+  .fdel{
+    width:30px;height:30px;padding:0;display:flex;align-items:center;justify-content:center;
+    color:var(--muted);border-color:transparent;background:transparent;font-size:17px;line-height:1;
+  }
+  .fdel:hover{color:var(--loss);background:var(--loss-soft);border-color:transparent}
+  .empty{color:var(--muted);font-size:13.5px;padding:2px 0}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+  .chip{
+    font:400 12.5px/1 var(--sans);padding:6px 11px;border-radius:999px;
+    border:1px solid var(--line);background:transparent;color:var(--muted);
+  }
+  .chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+  /* ---- receipt ---- */
+  .receipt{position:sticky;top:20px}
+  .headline{padding:20px 20px 18px;background:var(--panel-2);border-radius:var(--radius) var(--radius) 0 0}
+  .headline .lbl{
+    font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.13em;
+    color:var(--muted);margin-bottom:9px;
+  }
+  .headline .big{
+    font:600 clamp(30px,5.2vw,40px)/1.05 var(--mono);
+    letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--profit);
+  }
+  .headline.neg .big{color:var(--loss)}
+  .headline.idle .big{color:var(--muted)}
+  .headline .note{font-size:13.5px;color:var(--muted);margin-top:7px;min-height:1.55em}
+
+  .bar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line-soft);margin:16px 0 11px}
+  .bar span{display:block;transition:width .2s ease}
+  @media (prefers-reduced-motion: reduce){ .bar span{transition:none} }
+  .legend{display:flex;flex-wrap:wrap;gap:6px 15px;font:400 12px/1.4 var(--sans);color:var(--muted)}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  .perf{height:1px;background:repeating-linear-gradient(to right,var(--line) 0 4px,transparent 4px 9px)}
+
+  .lines{padding:14px 20px}
+  .line{display:flex;align-items:baseline;gap:9px;padding:5px 0;font-size:14px}
+  .line .k{color:var(--muted);white-space:nowrap}
+  .line .dots{flex:1;border-bottom:1px dotted var(--line);transform:translateY(-3px)}
+  .line .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13.5px;white-space:nowrap}
+  .line.sub{padding:2px 0 2px 15px;font-size:12.5px;color:var(--muted)}
+  .line.sub .v{font-size:12.5px;color:var(--muted)}
+  .line.total{margin-top:9px;padding-top:11px;border-top:1px solid var(--line);font-weight:600}
+  .line.total .k{color:var(--ink)}
+  .line.total .v{font-weight:600;font-size:15px}
+
+  .stats{
+    display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-soft);
+    border-top:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;
+  }
+  .stat{background:var(--panel);padding:13px 16px}
+  .stat .k{font:400 11.5px/1.3 var(--sans);color:var(--muted);margin-bottom:4px}
+  .stat .v{font:500 18px/1.2 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .stat .h{font:400 11px/1.3 var(--sans);color:var(--muted);margin-top:3px;opacity:.85}
+
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:28px}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);
+    background:var(--ink);color:var(--paper);padding:9px 17px;border-radius:99px;
+    font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:9;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  @media (prefers-reduced-motion: reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Profit Calculator</h1>
+      <p class="sub">Cost in, price out, fees on top &mdash; see exactly what you keep.</p>
+    </div>
+    <div class="head-actions">
+      <select id="currency" aria-label="Currency" style="width:auto"></select>
+      <button id="theme" class="ghost" title="Toggle light / dark" aria-label="Toggle light or dark theme">&#9680;</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- worksheet -->
+    <div class="col">
+      <section class="card">
+        <div class="card-head"><h2 class="eyebrow">The basics</h2></div>
+        <div class="card-body">
+          <div class="fields">
+            <div>
+              <label for="item">Item name <span class="opt">(optional)</span></label>
+              <input type="text" id="item" placeholder="e.g. Handmade candle">
+            </div>
+            <div class="row3">
+              <div>
+                <label for="cost">Cost of goods <span class="opt">/ unit</span></label>
+                <div class="input-wrap has-sym"><span class="sym" data-sym>$</span>
+                  <input type="number" id="cost" min="0" step="any" inputmode="decimal" placeholder="0.00"></div>
+              </div>
+              <div>
+                <label for="price">Selling price <span class="opt">/ unit</span></label>
+                <div class="input-wrap has-sym"><span class="sym" data-sym>$</span>
+                  <input type="number" id="price" min="0" step="any" inputmode="decimal" placeholder="0.00"></div>
+              </div>
+              <div>
+                <label for="qty">Quantity</label>
+                <div class="input-wrap">
+                  <input type="number" id="qty" min="0" step="any" inputmode="decimal" placeholder="1"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 class="eyebrow">Fees &amp; other costs</h2>
+          <button id="addFee" class="ghost" style="margin-left:auto;font-size:13px;padding:5px 11px">+ Add fee</button>
+        </div>
+        <div class="card-body">
+          <div class="fee-list" id="feeList"></div>
+          <div id="feeEmpty" class="empty">Nothing yet. Add a fee, or start from one of these:</div>
+          <div class="chips" id="presets"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-body actions">
+          <button id="copy" class="primary">Copy summary</button>
+          <button id="reset" class="ghost">Reset everything</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- receipt -->
+    <div class="col">
+      <section class="card receipt">
+        <div class="headline idle" id="headline">
+          <div class="lbl">Net profit</div>
+          <div class="big" id="profitBig">&mdash;</div>
+          <div class="note" id="profitNote">Enter a cost and a selling price to begin.</div>
+          <div class="bar">
+            <span id="barCogs" style="background:var(--cogs);width:0%"></span>
+            <span id="barFees" style="background:var(--fees);width:0%"></span>
+            <span id="barProfit" style="background:var(--profit);width:0%"></span>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--cogs)"></i>Cost of goods</span>
+            <span><i style="background:var(--fees)"></i>Fees</span>
+            <span><i style="background:var(--profit)"></i>Profit</span>
+          </div>
+        </div>
+        <div class="perf"></div>
+
+        <div class="lines">
+          <div class="line"><span class="k">Revenue</span><span class="dots"></span><span class="v" id="rRevenue">&mdash;</span></div>
+          <div class="line"><span class="k">Cost of goods</span><span class="dots"></span><span class="v" id="rCogs">&mdash;</span></div>
+          <div class="line"><span class="k">Total fees</span><span class="dots"></span><span class="v" id="rFees">&mdash;</span></div>
+          <div id="feeBreakdown"></div>
+          <div class="line total"><span class="k">Net profit</span><span class="dots"></span><span class="v" id="rProfit">&mdash;</span></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="k">Profit per unit</div><div class="v" id="sUnit">&mdash;</div></div>
+          <div class="stat"><div class="k">Profit margin</div><div class="v" id="sMargin">&mdash;</div>
+            <div class="h">of revenue</div></div>
+          <div class="stat"><div class="k">Markup</div><div class="v" id="sMarkup">&mdash;</div>
+            <div class="h">on total cost</div></div>
+          <div class="stat"><div class="k">Break-even price</div><div class="v" id="sBreakeven">&mdash;</div>
+            <div class="h">per unit</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>Everything is worked out in your browser and saved on this device. Nothing is sent anywhere.</footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CURRENCIES = [
+    ["USD","$"],["PHP","₱"],["EUR","€"],["GBP","£"],["JPY","¥"],["AUD","A$"],
+    ["CAD","C$"],["SGD","S$"],["INR","₹"],["MYR","RM"],["IDR","Rp"],["THB","฿"],
+    ["AED","AED"],["NZD","NZ$"],["ZAR","R"],["BRL","R$"],["MXN","MX$"]
+  ];
+
+  var FEE_TYPES = [
+    ["pct_price","% of selling price"],
+    ["pct_cost","% of cost of goods"],
+    ["flat_unit","flat, per unit"],
+    ["flat_total","flat, one-time"]
+  ];
+
+  var PRESETS = [
+    {label:"Card processing 2.9% + 0.30", rows:[
+      {name:"Card processing", value:2.9, type:"pct_price"},
+      {name:"Per-transaction fee", value:0.3, type:"flat_unit"}]},
+    {label:"Marketplace commission 10%", rows:[{name:"Marketplace commission", value:10, type:"pct_price"}]},
+    {label:"Ad spend 5%", rows:[{name:"Ad spend", value:5, type:"pct_price"}]},
+    {label:"Sales commission 10%", rows:[{name:"Sales commission", value:10, type:"pct_price"}]},
+    {label:"Shipping", rows:[{name:"Shipping", value:"", type:"flat_unit"}]},
+    {label:"Packaging", rows:[{name:"Packaging", value:"", type:"flat_unit"}]},
+    {label:"Listing fee (one-time)", rows:[{name:"Listing fee", value:"", type:"flat_total"}]}
+  ];
+
+  var KEY = "profit-calc-v1";
+  function $(id){ return document.getElementById(id); }
+
+  var state = load();
+
+  function load(){
+    var d = {item:"", cost:"", price:"", qty:"1", currency:"USD", fees:[], theme:null};
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(raw){
+        var s = JSON.parse(raw);
+        if(s && typeof s === "object"){
+          for(var k in d){
+            if(Object.prototype.hasOwnProperty.call(s, k) && s[k] !== null && s[k] !== undefined) d[k] = s[k];
+          }
+        }
+      }
+    }catch(e){}
+    if(!Array.isArray(d.fees)) d.fees = [];
+    return d;
+  }
+
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  /* ---------- formatting ---------- */
+  function symbol(){
+    for(var i=0;i<CURRENCIES.length;i++){ if(CURRENCIES[i][0] === state.currency) return CURRENCIES[i][1]; }
+    return "$";
+  }
+  function money(n){
+    if(typeof n !== "number" || !isFinite(n)) return "—";
+    try{
+      return new Intl.NumberFormat(undefined,
+        {style:"currency", currency:state.currency, maximumFractionDigits:2}).format(n);
+    }catch(e){
+      return symbol() + n.toFixed(2);
+    }
+  }
+  function pct(n){
+    if(typeof n !== "number" || !isFinite(n)) return "—";
+    return (Math.round(n*10)/10).toFixed(1) + "%";
+  }
+  function num(v){
+    var n = parseFloat(v);
+    return isFinite(n) ? n : 0;
+  }
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
+    });
+  }
+
+  /* ---------- math ---------- */
+  function compute(){
+    var cost  = num(state.cost);
+    var price = num(state.price);
+    var qty   = String(state.qty).trim() === "" ? 1 : num(state.qty);
+
+    var revenue = price * qty;
+    var cogs    = cost * qty;
+
+    var pctPrice = 0, pctCost = 0, flatUnit = 0, flatTotal = 0;
+    var detail = [];
+
+    for(var i=0;i<state.fees.length;i++){
+      var f = state.fees[i], v = num(f.value), amt = 0;
+      if(f.type === "pct_price"){       amt = revenue * v / 100; pctPrice  += v/100; }
+      else if(f.type === "pct_cost"){   amt = cogs    * v / 100; pctCost   += v/100; }
+      else if(f.type === "flat_total"){ amt = v;                 flatTotal += v;     }
+      else {                            amt = v * qty;           flatUnit  += v;     }
+      detail.push({name: (f.name || "").trim() || "Fee", amount: amt});
+    }
+
+    var fees = 0;
+    for(var j=0;j<detail.length;j++) fees += detail[j].amount;
+
+    var totalCost = cogs + fees;
+    var profit    = revenue - totalCost;
+
+    /* break-even price P, where profit = 0:
+       Q*P*(1 - sum%price) = Q*C*(1 + sum%cost) + Q*flatUnit + flatTotal */
+    var denom = qty * (1 - pctPrice);
+    var breakeven = denom > 0
+      ? (qty * cost * (1 + pctCost) + qty * flatUnit + flatTotal) / denom
+      : NaN;
+
+    return {
+      qty:qty, revenue:revenue, cogs:cogs, fees:fees, feeDetail:detail,
+      totalCost:totalCost, profit:profit,
+      margin:  revenue   > 0 ? profit / revenue   * 100 : NaN,
+      markup:  totalCost > 0 ? profit / totalCost * 100 : NaN,
+      perUnit: qty       > 0 ? profit / qty             : NaN,
+      breakeven: breakeven,
+      ready: price > 0 || cost > 0
+    };
+  }
+
+  /* ---------- render ---------- */
+  function clamp(n){ return Math.max(0, Math.min(100, isFinite(n) ? n : 0)); }
+
+  function render(){
+    var r = compute();
+    var head = $("headline");
+
+    head.classList.toggle("idle", !r.ready);
+    head.classList.toggle("neg", r.ready && r.profit < 0);
+    $("profitBig").textContent = r.ready ? money(r.profit) : "—";
+
+    var note;
+    if(!r.ready){
+      note = "Enter a cost and a selling price to begin.";
+    } else if(r.revenue <= 0){
+      note = "Set a selling price to see your margin.";
+    } else if(r.profit < 0){
+      note = isFinite(r.breakeven)
+        ? "Losing " + money(Math.abs(r.perUnit)) + " per unit. You break even at " + money(r.breakeven) + "."
+        : "Losing " + money(Math.abs(r.perUnit)) + " per unit.";
+    } else {
+      note = "You keep " + pct(r.margin) + " of every sale.";
+    }
+    $("profitNote").textContent = note;
+
+    var base = Math.max(r.revenue, r.totalCost, 1e-9);
+    $("barCogs").style.width   = clamp(r.cogs / base * 100) + "%";
+    $("barFees").style.width   = clamp(r.fees / base * 100) + "%";
+    $("barProfit").style.width = clamp(Math.max(r.profit, 0) / base * 100) + "%";
+
+    $("rRevenue").textContent = r.ready ? money(r.revenue) : "—";
+    $("rCogs").textContent    = r.ready ? "−" + money(r.cogs) : "—";
+    $("rFees").textContent    = r.ready ? "−" + money(r.fees) : "—";
+    $("rProfit").textContent  = r.ready ? money(r.profit) : "—";
+
+    var bd = "";
+    for(var i=0;i<r.feeDetail.length;i++){
+      if(!r.feeDetail[i].amount) continue;
+      bd += '<div class="line sub"><span class="k">' + esc(r.feeDetail[i].name)
+          + '</span><span class="dots"></span><span class="v">'
+          + money(r.feeDetail[i].amount) + '</span></div>';
+    }
+    $("feeBreakdown").innerHTML = r.ready ? bd : "";
+
+    $("sUnit").textContent      = r.ready ? money(r.perUnit)   : "—";
+    $("sMargin").textContent    = r.ready ? pct(r.margin)      : "—";
+    $("sMarkup").textContent    = r.ready ? pct(r.markup)      : "—";
+    $("sBreakeven").textContent = r.ready ? money(r.breakeven) : "—";
+
+    var syms = document.querySelectorAll("[data-sym]");
+    for(var s=0;s<syms.length;s++) syms[s].textContent = symbol();
+
+    $("feeEmpty").style.display = state.fees.length ? "none" : "block";
+    save();
+  }
+
+  /* ---------- fee rows ---------- */
+  function renderFees(){
+    var list = $("feeList");
+    list.innerHTML = "";
+
+    state.fees.forEach(function(fee){
+      var row = document.createElement("div");
+      row.className = "fee-row";
+
+      var name = document.createElement("input");
+      name.type = "text"; name.className = "fname"; name.placeholder = "Fee name";
+      name.value = fee.name || "";
+      name.setAttribute("aria-label", "Fee name");
+      name.addEventListener("input", function(){ fee.name = name.value; render(); });
+
+      var vwrap = document.createElement("div");
+      vwrap.className = "input-wrap fval";
+      var val = document.createElement("input");
+      val.type = "number"; val.step = "any"; val.inputMode = "decimal"; val.placeholder = "0";
+      val.value = (fee.value === 0 || fee.value) ? fee.value : "";
+      val.setAttribute("aria-label", "Fee amount");
+      val.addEventListener("input", function(){ fee.value = val.value; render(); });
+      vwrap.appendChild(val);
+
+      var type = document.createElement("select");
+      type.className = "ftype";
+      type.setAttribute("aria-label", "How this fee is charged");
+      FEE_TYPES.forEach(function(t){
+        var o = document.createElement("option");
+        o.value = t[0]; o.textContent = t[1];
+        if(t[0] === fee.type) o.selected = true;
+        type.appendChild(o);
+      });
+      type.addEventListener("change", function(){ fee.type = type.value; render(); });
+
+      var del = document.createElement("button");
+      del.className = "fdel"; del.type = "button"; del.innerHTML = "&times;";
+      del.title = "Remove fee"; del.setAttribute("aria-label", "Remove fee");
+      del.addEventListener("click", function(){
+        var i = state.fees.indexOf(fee);
+        if(i > -1) state.fees.splice(i, 1);
+        renderFees(); render();
+      });
+
+      row.appendChild(name); row.appendChild(vwrap); row.appendChild(type); row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+
+  function addFee(f, focus){
+    state.fees.push({
+      name:  f.name  || "",
+      value: f.value === undefined ? "" : f.value,
+      type:  f.type  || "flat_unit"
+    });
+    renderFees();
+    render();
+    if(focus){
+      var rows = $("feeList").querySelectorAll(".fee-row");
+      if(rows.length) rows[rows.length - 1].querySelector("input").focus();
+    }
+  }
+
+  /* ---------- wiring ---------- */
+  CURRENCIES.forEach(function(c){
+    var o = document.createElement("option");
+    o.value = c[0];
+    o.textContent = c[0] + "  " + c[1];
+    $("currency").appendChild(o);
+  });
+  $("currency").value = state.currency;
+  $("currency").addEventListener("change", function(){
+    state.currency = this.value;
+    render();
+  });
+
+  ["item","cost","price","qty"].forEach(function(id){
+    var el = $(id);
+    el.value = state[id];
+    el.addEventListener("input", function(){ state[id] = el.value; render(); });
+  });
+
+  PRESETS.forEach(function(p){
+    var b = document.createElement("button");
+    b.className = "chip"; b.type = "button";
+    b.textContent = "+ " + p.label;
+    b.addEventListener("click", function(){
+      p.rows.forEach(function(r){ addFee(r, false); });
+    });
+    $("presets").appendChild(b);
+  });
+
+  $("addFee").addEventListener("click", function(){ addFee({}, true); });
+
+  $("reset").addEventListener("click", function(){
+    if(!window.confirm("Clear all inputs and fees?")) return;
+    state = {item:"", cost:"", price:"", qty:"1",
+             currency:state.currency, fees:[], theme:state.theme};
+    ["item","cost","price","qty"].forEach(function(id){ $(id).value = state[id]; });
+    renderFees(); render();
+    toast("Cleared");
+  });
+
+  $("copy").addEventListener("click", function(){
+    var r = compute();
+    var L = [];
+    L.push(state.item ? state.item : "Profit summary");
+    L.push("");
+    L.push("Selling price:  " + money(num(state.price)) + "  x " + r.qty);
+    L.push("Cost of goods:  " + money(num(state.cost)) + "  x " + r.qty);
+    L.push("");
+    L.push("Revenue:        " + money(r.revenue));
+    L.push("Cost of goods: -" + money(r.cogs));
+    L.push("Fees:          -" + money(r.fees));
+    r.feeDetail.forEach(function(f){
+      if(f.amount) L.push("    " + f.name + ": " + money(f.amount));
+    });
+    L.push("Net profit:     " + money(r.profit));
+    L.push("");
+    L.push("Profit / unit:  " + money(r.perUnit));
+    L.push("Margin:         " + pct(r.margin));
+    L.push("Markup:         " + pct(r.markup));
+    L.push("Break-even:     " + money(r.breakeven));
+
+    var text = L.join("\n");
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(
+        function(){ toast("Summary copied"); },
+        function(){ fallbackCopy(text); }
+      );
+    } else {
+      fallbackCopy(text);
+    }
+  });
+
+  function fallbackCopy(text){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand("copy"); toast("Summary copied"); }
+    catch(e){ toast("Couldn't copy — select the summary and copy it manually"); }
+    document.body.removeChild(ta);
+  }
+
+  var toastT;
+  function toast(msg){
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastT);
+    toastT = setTimeout(function(){ t.classList.remove("show"); }, 1800);
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme(){
+    if(state.theme) document.documentElement.setAttribute("data-theme", state.theme);
+    else document.documentElement.removeAttribute("data-theme");
+  }
+  $("theme").addEventListener("click", function(){
+    var dark = state.theme
+      ? state.theme === "dark"
+      : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    state.theme = dark ? "light" : "dark";
+    applyTheme();
+    save();
+  });
+  applyTheme();
+
+  renderFees();
+  render();
+})();
+</script>
+</body>
+</html>
